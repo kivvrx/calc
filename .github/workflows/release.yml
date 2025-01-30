@@ -14,28 +14,19 @@ jobs:
         with:
           submodules: true
 
-      # Устанавливаем vcpkg и Boost.Test
-      - name: Setup dependencies
-        run: |
-          git clone https://github.com/Microsoft/vcpkg.git
-          .\vcpkg\bootstrap-vcpkg.bat
-          .\vcpkg\vcpkg install boost-test:x64-windows
-
-      # Настраиваем окружение MSVC
       - name: Add MSVC to PATH
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
-      # Генерация проекта с указанием vcpkg
-      - run: cmake . -DPATCH_VERSION=${{ github.run_number }} -B build -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
-
-      # Сборка и тесты
+      - run: cmake . -DPATCH_VERSION=${{ github.run_number }} -B build
       - run: cmake --build build --config Release
       - run: ctest --test-dir build --build-config Release
-
-      # Упаковка и релиз (аналогично предыдущим шагам)
+      
+      # Явно указываем путь для пакета
       - run: cmake --build build --target package
+      - run: dir /s build  # Проверяем содержимое
+
       - name: Create Release
         uses: actions/create-release@v1
         id: create_release
@@ -46,12 +37,13 @@ jobs:
           release_name: Release ${{ github.run_number }}
           draft: false
           prerelease: false
+
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./build/helloworld-0.0.${{ github.run_number }}-win64.zip
+          asset_path: ./build/_packages/helloworld-0.0.${{ github.run_number }}-win64.zip
           asset_name: helloworld-0.0.${{ github.run_number }}-win64.zip
           asset_content_type: application/zip
