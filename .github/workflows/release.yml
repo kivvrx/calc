@@ -10,34 +10,35 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
         with:
           submodules: true
-      - name: Install MSVC Build Tools
+
+      # Устанавливаем vcpkg и Boost.Test
+      - name: Setup dependencies
         run: |
-          choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --includeOptional" --yes
-      - name: Install CMake
-        uses: jwlawson/actions-setup-cmake@v1
-        with:
-          cmake-version: '3.20.1'
-      - name: Install vcpkg
-        run: |
-          git clone https://github.com/microsoft/vcpkg.git
+          git clone https://github.com/Microsoft/vcpkg.git
           .\vcpkg\bootstrap-vcpkg.bat
-          .\vcpkg\vcpkg.exe integrate install
-          .\vcpkg\vcpkg.exe install boost-test:x64-windows
-      - name: Configure CMake
-        run: cmake . -DCMAKE_TOOLCHAIN_FILE=.\vcpkg\scripts\buildsystems\vcpkg.cmake -DPATCH_VERSION=${{ github.run_number }}
-      - name: Build Project
-        run: cmake --build .
-      - name: Run Tests
-        run: ctest --output-on-failure
-      - name: Package Project
-        run: cmake --build . --target package
+          .\vcpkg\vcpkg install boost-test:x64-windows
+
+      # Настраиваем окружение MSVC
+      - name: Add MSVC to PATH
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # Генерация проекта с указанием vcpkg
+      - run: cmake . -DPATCH_VERSION=${{ github.run_number }} -B build -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+
+      # Сборка и тесты
+      - run: cmake --build build --config Release
+      - run: ctest --test-dir build --build-config Release
+
+      # Упаковка и релиз (аналогично предыдущим шагам)
+      - run: cmake --build build --target package
       - name: Create Release
-        id: create_release
         uses: actions/create-release@v1
+        id: create_release
         env:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
@@ -46,12 +47,11 @@ jobs:
           draft: false
           prerelease: false
       - name: Upload Release Asset
-        id: upload-release-asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./helloworld-0.0.${{ github.run_number }}-x64-Windows.zip
-          asset_name: helloworld-0.0.${{ github.run_number }}-x64-Windows.zip
+          asset_path: ./build/helloworld-0.0.${{ github.run_number }}-win64.zip
+          asset_name: helloworld-0.0.${{ github.run_number }}-win64.zip
           asset_content_type: application/zip
