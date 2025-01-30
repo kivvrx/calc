@@ -8,16 +8,30 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
         with:
           submodules: true
-      - run: sudo apt-get update && sudo apt-get install libboost-test-dev -y
-      - run: cmake . -DPATCH_VERSION=${{ github.run_number }}
-      - run: cmake --build .
-      - run: cmake --build . --target test
-      - run: cmake --build . --target package
+      - name: Setup vcpkg
+        uses: lukka/get-cmake@v3
+        with:
+          cmakeVersion: '3.20.1'  
+      - name: Install vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          .\vcpkg\bootstrap-vcpkg.bat
+          .\vcpkg\vcpkg.exe integrate install
+          .\vcpkg\vcpkg.exe install boost-test:x64-windows
+      - name: Configure CMake
+        run: cmake . -DCMAKE_TOOLCHAIN_FILE=.\vcpkg\scripts\buildsystems\vcpkg.cmake -DPATCH_VERSION=${{ github.run_number }}
+      - name: Build Project
+        run: cmake --build .
+      - name: Run Tests
+        run: ctest --output-on-failure
+      - name: Package Project
+        run: cmake --build . --target package
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -35,6 +49,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./helloworld-0.0.${{ github.run_number }}-Linux.deb
-          asset_name: helloworld-0.0.${{ github.run_number }}-Linux.deb
-          asset_content_type: application/vnd.debian.binary-package
+          asset_path: ./helloworld-0.0.${{ github.run_number }}-x64-Windows.zip
+          asset_name: helloworld-0.0.${{ github.run_number }}-x64-Windows.zip
+          asset_content_type: application/zip
