@@ -15,7 +15,7 @@ jobs:
         with:
           submodules: true
       - name: Setup vcpkg
-        uses: lukka/get-cmake@v3
+        uses: lukka/get-cmake@latest
         with:
           cmakeVersion: '3.20.1'  
       - name: Install vcpkg
